@@ -1,10 +1,10 @@
 package ru.yandex.practicum.gym;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class Timetable {
-
-    private final Map<DayOfWeek, TreeMap<TimeOfDay, List<TrainingSession>>> timetable;
+    private final Map<DayOfWeek, List<TrainingSession>> timetable;
 
     public Timetable() {
         this.timetable = new HashMap<>();
@@ -12,59 +12,47 @@ public class Timetable {
 
     public void addNewTrainingSession(TrainingSession trainingSession) {
         DayOfWeek day = trainingSession.getDayOfWeek();
-        TimeOfDay time = trainingSession.getTimeOfDay();
 
-        // Получаем или создаём TreeMap для этого дня
-        timetable.putIfAbsent(day, new TreeMap<>());
-        TreeMap<TimeOfDay, List<TrainingSession>> daySchedule = timetable.get(day);
+        timetable.putIfAbsent(day, new ArrayList<>());
+        List<TrainingSession> dayList = timetable.get(day);
 
-        // Получаем или создаём список для этого времени
-        daySchedule.putIfAbsent(time, new ArrayList<>());
+        dayList.add(trainingSession);
 
-        // Добавляем тренировку в список
-        daySchedule.get(time).add(trainingSession);
+        dayList.sort(Comparator.comparing(TrainingSession::getTimeOfDay));
     }
 
     public List<TrainingSession> getTrainingSessionsForDay(DayOfWeek dayOfWeek) {
-        List<TrainingSession> result = new ArrayList<>();
-        TreeMap<TimeOfDay, List<TrainingSession>> daySchedule = timetable.get(dayOfWeek);
+        List<TrainingSession> daySessions = timetable.get(dayOfWeek);
 
-        if (daySchedule != null) {
-            // TreeMap уже отсортирован по времени благодаря Comparable<TimeOfDay>
-            for (List<TrainingSession> sessions : daySchedule.values()) {
-                result.addAll(sessions);
-            }
-        }
-
-        return result;
+        return daySessions != null
+                ? Collections.unmodifiableList(daySessions)
+                : Collections.emptyList();
     }
-
 
     public List<TrainingSession> getTrainingSessionsForDayAndTime(
             DayOfWeek dayOfWeek, TimeOfDay timeOfDay) {
 
-        TreeMap<TimeOfDay, List<TrainingSession>> daySchedule = timetable.get(dayOfWeek);
+        List<TrainingSession> daySessions = timetable.get(dayOfWeek);
 
-        if (daySchedule == null) {
+        if (daySessions == null) {
             return Collections.emptyList();
         }
 
-        List<TrainingSession> sessions = daySchedule.get(timeOfDay);
-        // Возвращаем копию, чтобы защитить внутреннее состояние
-        return sessions != null ? new ArrayList<>(sessions) : Collections.emptyList();
+        return daySessions.stream()
+                .filter(session -> session.getTimeOfDay().equals(timeOfDay))
+                .collect(Collectors.collectingAndThen(
+                        Collectors.toList(),
+                        Collections::unmodifiableList
+                ));
     }
 
-
     public List<CounterOfTrainings> getCountByCoaches() {
-
         Map<Coach, Integer> coachCounts = new HashMap<>();
 
-        for (TreeMap<TimeOfDay, List<TrainingSession>> daySchedule : timetable.values()) {
-            for (List<TrainingSession> sessions : daySchedule.values()) {
-                for (TrainingSession session : sessions) {
-                    Coach coach = session.getCoach();
-                    coachCounts.put(coach, coachCounts.getOrDefault(coach, 0) + 1);
-                }
+        for (List<TrainingSession> sessions : timetable.values()) {
+            for (TrainingSession session : sessions) {
+                Coach coach = session.getCoach();
+                coachCounts.put(coach, coachCounts.getOrDefault(coach, 0) + 1);
             }
         }
 
